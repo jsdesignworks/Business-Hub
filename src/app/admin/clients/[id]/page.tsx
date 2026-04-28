@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase'
@@ -32,8 +33,11 @@ export default function ClientDetailPage() {
       const { data } = await supabase.from('clients').select('*').eq('id', id).single()
       return data as Client
     },
-    onSuccess: (data) => { setForm(data) },
   })
+
+  useEffect(() => {
+    if (client) setForm(client)
+  }, [client])
 
   const { data: invoices = [] } = useQuery({
     queryKey: ['client-invoices', id],
@@ -86,7 +90,7 @@ export default function ClientDetailPage() {
   if (!client) return (
     <div className="p-8 text-center">
       <p className="text-gray-500">Client not found.</p>
-      <Button asChild className="mt-4" variant="outline"><Link href="/admin/clients">Back</Link></Button>
+      <Button className="mt-4" variant="outline" onClick={() => router.push("/admin/clients")}>Back</Button>
     </div>
   )
 
@@ -97,8 +101,8 @@ export default function ClientDetailPage() {
   return (
     <div className="p-8">
       {/* Back + Header */}
-      <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2 text-gray-500">
-        <Link href="/admin/clients"><ArrowLeft className="w-4 h-4 mr-1" />Back to Clients</Link>
+      <Button variant='ghost' size='sm' className='mb-4 -ml-2 text-gray-500' onClick={() => router.push('/admin/clients')}>
+        <ArrowLeft className='w-4 h-4 mr-1' />Back to Clients
       </Button>
 
       <div className="flex items-start justify-between mb-6">
@@ -182,7 +186,7 @@ export default function ClientDetailPage() {
                       </div>
                       <div className="space-y-1.5 sm:col-span-2">
                         <Label>Status</Label>
-                        <Select value={form.status ?? 'prospect'} onValueChange={(v) => set('status', v)}>
+                        <Select value={form.status ?? 'prospect'} onValueChange={(v) => set('status', v ?? 'prospect')}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="prospect">Prospect</SelectItem>
@@ -248,14 +252,14 @@ export default function ClientDetailPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                  <Button className="w-full justify-start bg-indigo-600 hover:bg-indigo-700" size="sm" asChild>
-                    <Link href={`/admin/messages?client=${id}`}>Send Message</Link>
+                  <Button className='w-full justify-start bg-indigo-600 hover:bg-indigo-700' size='sm' onClick={() => router.push('/admin/messages?client=' + id)}>
+                    Send Message
                   </Button>
-                  <Button className="w-full justify-start" variant="outline" size="sm" asChild>
-                    <Link href={`/admin/invoices/new?client=${id}`}>Create Invoice</Link>
+                  <Button className='w-full justify-start' variant='outline' size='sm' onClick={() => router.push('/admin/invoices/new?client=' + id)}>
+                    Create Invoice
                   </Button>
-                  <Button className="w-full justify-start" variant="outline" size="sm" asChild>
-                    <Link href={`/admin/questionnaires?assign=${id}`}>Assign Questionnaire</Link>
+                  <Button className='w-full justify-start' variant='outline' size='sm' onClick={() => router.push('/admin/questionnaires?assign=' + id)}>
+                    Assign Questionnaire
                   </Button>
                 </CardContent>
               </Card>
@@ -269,8 +273,8 @@ export default function ClientDetailPage() {
               {invoices.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-gray-400">No invoices yet.</p>
-                  <Button size="sm" className="mt-3 bg-indigo-600 hover:bg-indigo-700" asChild>
-                    <Link href={`/admin/invoices/new?client=${id}`}>Create Invoice</Link>
+                  <Button size='sm' className='mt-3 bg-indigo-600 hover:bg-indigo-700' onClick={() => router.push('/admin/invoices/new?client=' + id)}>
+                    Create Invoice
                   </Button>
                 </div>
               ) : (
