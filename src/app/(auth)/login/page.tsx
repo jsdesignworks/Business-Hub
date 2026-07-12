@@ -72,16 +72,7 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <button
-                    type="button"
-                    onClick={() => setMode('forgot')}
-                    className="text-sm text-indigo-600 hover:text-indigo-500"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -94,6 +85,13 @@ export default function LoginPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Signing in…' : 'Sign in'}
               </Button>
+              <button
+                type="button"
+                onClick={() => setMode('forgot')}
+                className="w-full text-center text-sm font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Forgot password?
+              </button>
             </form>
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
