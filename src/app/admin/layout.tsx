@@ -31,13 +31,18 @@ const navItems = [
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { profile, loading, isAdmin, signOut } = useAuth()
+  const { user, profile, loading, isAdmin, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
-    if (!loading && !isAdmin) router.push('/login')
-  }, [loading, isAdmin, router])
+    if (loading) return
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    if (!isAdmin) router.push('/account')
+  }, [loading, user, isAdmin, router])
 
   if (loading) return (
     <div className="flex h-screen">
@@ -51,14 +56,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </div>
   )
 
-  if (!isAdmin) return null
+  if (!user || !isAdmin) return null
 
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className="w-60 bg-white border-r flex flex-col">
         <div className="p-4 border-b">
           <div className="flex items-center gap-2">
-            <div className="w8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">D</span>
             </div>
             <div>

@@ -25,8 +25,34 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
-    const { data: profile } = await supabase
+
+    let { data: profile } = await supabase
       .from('profiles').select('role').eq('id', data.user.id).maybeSingle()
+
+    if (!profile) {
+      const meta = data.user.user_metadata ?? {}
+      const role =
+        meta.role === 'admin' || meta.role === 'client' || meta.role === 'prospect'
+          ? meta.role
+          : 'client'
+      const { data: upserted, error: upsertError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: data.user.id,
+          email: data.user.email ?? email,
+          full_name: meta.full_name ?? meta.name ?? null,
+          role,
+        })
+        .select('role')
+        .maybeSingle()
+      if (upsertError) {
+        toast.error(upsertError.message)
+        setLoading(false)
+        return
+      }
+      profile = upserted
+    }
+
     router.push(profile?.role === 'admin' ? '/admin' : '/account')
   }
 

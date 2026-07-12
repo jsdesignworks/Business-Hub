@@ -20,14 +20,18 @@ const navItems = [
 ]
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  const { profile, loading, isAdmin, signOut } = useAuth()
+  const { user, profile, loading, isAdmin, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
-    if (!loading && !profile) router.push('/login')
-    if (!loading && isAdmin) router.push('/admin')
-  }, [loading, profile, isAdmin, router])
+    if (loading) return
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    if (isAdmin) router.push('/admin')
+  }, [loading, user, isAdmin, router])
 
   if (loading) return (
     <div className="flex h-screen">
@@ -38,14 +42,38 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     </div>
   )
 
-  if (!profile) return null
+  if (!user) return null
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="max-w-md w-full space-y-4 text-center">
+          <h1 className="text-xl font-semibold text-gray-900">Account not set up</h1>
+          <p className="text-sm text-gray-500">
+            You&apos;re signed in, but your profile is missing. Sign out and try again, or contact an admin.
+          </p>
+          <p className="text-xs text-gray-400 truncate">{user.email}</p>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await signOut()
+              router.push('/login')
+            }}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign out
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className="w-60 bg-white border-r flex flex-col">
         <div className="p-4 border-b">
           <div className="flex items-center gap-2">
-            <div className="w8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">D</span>
             </div>
             <div>
@@ -70,7 +98,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
         </nav>
         <div className="p-3 border-t">
           <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
-            <Avatar className="w7 h-7">
+            <Avatar className="w-7 h-7">
               <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700">
                 {profile?.full_name?.[0] ?? 'C'}
               </AvatarFallback>

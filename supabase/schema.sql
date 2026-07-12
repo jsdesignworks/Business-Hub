@@ -116,7 +116,8 @@ alter table messages enable row level security;
 alter table files enable row level security;
 
 -- Profiles: users can read/update own; admins can read all
-create policy "users_own_profile" on profiles for all using (acth.uid() = id);
+-- If live policy still uses acth.uid(), run supabase/migrations/20260712_fix_profiles_own_rls.sql
+create policy "users_own_profile" on profiles for all using (auth.uid() = id);
 create policy "admins_all_profiles" on profiles for select using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );

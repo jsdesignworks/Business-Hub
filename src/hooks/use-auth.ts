@@ -1,7 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState, useCallback } from 'react'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User, Session, SupabaseClient } from '@supabase/supabase-js'
 import type { Profile } from '@/types'
 
 interface AuthState {
@@ -12,6 +12,21 @@ interface AuthState {
   isAdmin: boolean
   isClient: boolean
   isProspect: boolean
+}
+
+let browserClient: SupabaseClient | null = null
+
+function getBrowserClient() {
+  if (!browserClient) browserClient = createClient()
+  return browserClient
+}
+
+function rolesFromProfile(profile: Profile | null) {
+  return {
+    isAdmin: profile?.role === 'admin',
+    isClient: profile?.role === 'client',
+    isProspect: profile?.role === 'prospect',
+  }
 }
 
 export function useAuth() {
@@ -33,7 +48,7 @@ export function useAuth() {
     user: null, session: null, profile: null,
     loading: true, isAdmin: false, isClient: false, isProspect: false,
   })
-  const supabase = createClient()
+  const [supabase] = useState(() => getBrowserClient())
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
@@ -41,27 +56,49 @@ export function useAuth() {
   }, [supabase])
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+    let cancelled = false
+
+    const applySession = async (session: Session | null) => {
       const user = session?.user ?? null
-      const profile = user ? await fetchProfile(user.id) : null
-      setState({ user, session, profile, loading: false,
-        isAdmin: profile?.role === 'admin',
-        isClient: profile?.role === 'client',
-        isProspect: profile?.role === 'prospect',
+      let profile: Profile | null = null
+      try {
+        profile = user ? await fetchProfile(user.id) : null
+      } catch {
+        profile = null
+      }
+      if (cancelled) return
+      setState({
+        user,
+        session,
+        profile,
+        loading: false,
+        ...rolesFromProfile(profile),
       })
     }
+
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        await applySession(session)
+      } catch {
+        if (!cancelled) {
+          setState({
+            user: null, session: null, profile: null,
+            loading: false, isAdmin: false, isClient: false, isProspect: false,
+          })
+        }
+      }
+    }
+
     init()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, session) => {
-      const user = session?.user ?? null
-      const profile = user ? await fetchProfile(user.id) : null
-      setState({ user, session, profile, loading: false,
-        isAdmin: profile?.role === 'admin',
-        isClient: profile?.role === 'client',
-        isProspect: profile?.role === 'prospect',
-      })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await applySession(session)
     })
-    return () => subscription.unsubscribe()
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [fetchProfile, supabase])
 
   const signOut = async () => { await supabase.auth.signOut() }
