@@ -1,15 +1,27 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+function getSupabaseEnv() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Set them in Vercel env and rebuild."
+    )
+  }
+  return { supabaseUrl, anonKey }
+}
+
 export async function middleware(request: NextRequest) {
   // DEV BYPASS: if cookie dev_bypass=1, skip auth entirely
   const devBypass = request.cookies.get("dev_bypass")?.value === "1"
   if (devBypass) return NextResponse.next()
 
+  const { supabaseUrl, anonKey } = getSupabaseEnv()
   let supabaseResponse = NextResponse.next({ request })
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    anonKey,
     {
       cookies: {
         getAll() { return request.cookies.getAll() },
@@ -29,16 +41,16 @@ export async function middleware(request: NextRequest) {
   const isResetPassword = pathname.startsWith("/reset-password")
   const isPublicPath = pathname === "/" || pathname.startsWith("/pay") || isResetPassword
   if (!user && !isLoginPage && !isPublicPath) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/login"
-    return NextResponse.redirect(url)
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = "/login"
+    return NextResponse.redirect(redirectUrl)
   }
   // Allow authenticated users on /reset-password (recovery session must stay)
   if (user && isLoginPage) {
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    const url = request.nextUrl.clone()
-    url.pathname = profile?.role === "admin" ? "/admin" : "/account"
-    return NextResponse.redirect(url)
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = profile?.role === "admin" ? "/admin" : "/account"
+    return NextResponse.redirect(redirectUrl)
   }
   return supabaseResponse
 }

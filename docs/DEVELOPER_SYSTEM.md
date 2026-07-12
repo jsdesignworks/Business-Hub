@@ -97,7 +97,25 @@ Required for Supabase (client and middleware):
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Set these in `.env.local` locally and in the hosting dashboard (e.g. Vercel) for production.
+Set these in `.env.local` locally and in the hosting dashboard (e.g. Vercel) for production. `NEXT_PUBLIC_*` values are baked in at **build** time — change them on Vercel, then redeploy.
+
+### 3.4 DevTools: “No API key found” vs real failures
+
+Opening `https://<project>.supabase.co/auth/v1/user` in a **new browser tab** always returns:
+
+```json
+{"message":"No API key found in request","hint":"No `apikey` request header or url param was found."}
+```
+
+That is expected: a normal navigation does not send the `apikey` / `Authorization` headers that the JS client adds. It does **not** mean the app is missing the key.
+
+To verify the real request on `/account` (or any signed-in page):
+
+1. Open **Network**, filter by `auth/v1` or `supabase`.
+2. Select the XHR/fetch to `/auth/v1/user` (not a new tab).
+3. Confirm **Request Headers** include `apikey` and usually `authorization: Bearer …`.
+4. If `apikey` is missing on the XHR → Production env vars are wrong/missing; fix and redeploy.
+5. Profile lookups use `.maybeSingle()` so a missing `profiles` row returns `null` instead of a failed `.single()` response.
 
 ---
 
@@ -185,8 +203,9 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
 ## 9. Deployment notes (typical: GitHub + Vercel + Supabase)
 
 1. Connect the repo to Vercel (or similar).
-2. Set **`NEXT_PUBLIC_SUPABASE_URL`** and **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** in the project environment.
-3. In **Supabase Auth → URL Configuration**, use these values for production (`dash.designworks.app`):
+2. Set **`NEXT_PUBLIC_SUPABASE_URL`** and **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** in the project environment (Vercel → Settings → Environment Variables → Production). Values must match Supabase → Project Settings → API. Redeploy after changing `NEXT_PUBLIC_*`.
+3. Confirm Production has both keys before shipping: project **business-hub** (`dash.designworks.app`). Missing keys cause cryptic auth 422s; the client now throws a clear error if either is unset at runtime.
+4. In **Supabase Auth → URL Configuration**, use these values for production (`dash.designworks.app`):
 
    | Setting | Value |
    |---------|--------|
@@ -194,7 +213,7 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
    | **Redirect URLs** | `https://dash.designworks.app/reset-password`, `https://dash.designworks.app/login`, `http://localhost:3000/reset-password`, `http://localhost:3000/login` |
 
    Password reset emails use `redirectTo` → `/reset-password`. After changing Site URL / Redirect URLs, send a **new** reset email; old links keep the previous destination.
-4. The System page’s **Vercel** badge appears only if **`NEXT_PUBLIC_VERCEL_ENV`** is injected (Vercel does this automatically on their platform when configured).
+5. The System page’s **Vercel** badge appears only if **`NEXT_PUBLIC_VERCEL_ENV`** is injected (Vercel does this automatically on their platform when configured).
 
 ---
 

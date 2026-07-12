@@ -36,7 +36,7 @@ export function useAuth() {
   const supabase = createClient()
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     return data as Profile | null
   }, [supabase])
 
