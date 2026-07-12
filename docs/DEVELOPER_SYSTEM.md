@@ -81,8 +81,8 @@ flowchart TB
 1. If cookie **`dev_bypass=1`** → request proceeds without Supabase auth (development convenience).
 2. Otherwise builds a server Supabase client with request/response cookies, calls `getUser()`.
 3. Unauthenticated users on non-public paths → redirect **`/login`**.
-4. Public-ish paths: `/`, `/pay/*`, and auth pages `/login`, `/onboarding`.
-5. Authenticated users on auth pages → redirect to **`/admin`** or **`/account`** based on **`profiles.role`**.
+4. Public-ish paths: `/`, `/pay/*`, `/reset-password`, and auth pages `/login`, `/onboarding`.
+5. Authenticated users on `/login` or `/onboarding` → redirect to **`/admin`** or **`/account`** based on **`profiles.role`**. Recovery users on **`/reset-password`** are not redirected away.
 
 ### 3.2 Client hook [`src/hooks/use-auth.ts`](src/hooks/use-auth.ts)
 
@@ -186,7 +186,14 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
 
 1. Connect the repo to Vercel (or similar).
 2. Set **`NEXT_PUBLIC_SUPABASE_URL`** and **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** in the project environment.
-3. In **Supabase Auth** settings, add site URL and redirect URLs for production (and `http://localhost:3000` for local).
+3. In **Supabase Auth → URL Configuration**, use these values for production (`dash.designworks.app`):
+
+   | Setting | Value |
+   |---------|--------|
+   | **Site URL** | `https://dash.designworks.app` (origin only — not `/login`) |
+   | **Redirect URLs** | `https://dash.designworks.app/reset-password`, `https://dash.designworks.app/login`, `http://localhost:3000/reset-password`, `http://localhost:3000/login` |
+
+   Password reset emails use `redirectTo` → `/reset-password`. After changing Site URL / Redirect URLs, send a **new** reset email; old links keep the previous destination.
 4. The System page’s **Vercel** badge appears only if **`NEXT_PUBLIC_VERCEL_ENV`** is injected (Vercel does this automatically on their platform when configured).
 
 ---
