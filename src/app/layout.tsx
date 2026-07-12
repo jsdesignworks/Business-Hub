@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Providers } from '@/components/shared/Providers'
 import DevBypassToggle from '@/components/shared/DevBypassToggle'
+import { Analytics } from '@vercel/analytics/next'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </TooltipProvider>
           <DevBypassToggle />
         </Providers>
+        <Analytics />
       </body>
     </html>
   )
