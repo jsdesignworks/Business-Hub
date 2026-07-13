@@ -44,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!isAdmin) router.push('/account')
   }, [loading, user, isAdmin, router])
 
-  if (loading) return (
+  if (loading || !user || !isAdmin) return (
     <div className="flex h-screen">
       <div className="w-60 border-r bg-white p-4 space-y-2">
         {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
@@ -55,8 +55,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
     </div>
   )
-
-  if (!user || !isAdmin) return null
 
   return (
     <div className="flex h-screen bg-gray-50">

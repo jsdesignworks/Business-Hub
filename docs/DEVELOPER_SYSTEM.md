@@ -99,6 +99,8 @@ Required for Supabase (client and middleware):
 
 Set these in `.env.local` locally and in the hosting dashboard (e.g. Vercel) for production. `NEXT_PUBLIC_*` values are baked in at **build** time — change them on Vercel, then redeploy.
 
+**Profiles RLS:** own-row policy must use `auth.uid() = id`. If sign-in reaches “Account not set up” or profile upsert fails, run [`supabase/migrations/20260712_fix_profiles_own_rls.sql`](../supabase/migrations/20260712_fix_profiles_own_rls.sql) in the Supabase SQL Editor.
+
 ### 3.4 DevTools: “No API key found” vs real failures
 
 Opening `https://<project>.supabase.co/auth/v1/user` in a **new browser tab** always returns:

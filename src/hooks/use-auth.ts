@@ -14,6 +14,8 @@ interface AuthState {
   isProspect: boolean
 }
 
+const AUTH_INIT_TIMEOUT_MS = 8000
+
 let browserClient: SupabaseClient | null = null
 
 function getBrowserClient() {
@@ -27,6 +29,14 @@ function rolesFromProfile(profile: Profile | null) {
     isClient: profile?.role === 'client',
     isProspect: profile?.role === 'prospect',
   }
+}
+
+function roleFromMetadata(user: User): Profile['role'] {
+  const meta = user.user_metadata ?? {}
+  if (meta.role === 'admin' || meta.role === 'client' || meta.role === 'prospect') {
+    return meta.role
+  }
+  return 'client'
 }
 
 export function useAuth() {
@@ -55,14 +65,27 @@ export function useAuth() {
     return data as Profile | null
   }, [supabase])
 
+  const ensureProfile = useCallback(async (user: User) => {
+    let profile = await fetchProfile(user.id)
+    if (profile) return profile
+
+    const meta = user.user_metadata ?? {}
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      email: user.email ?? '',
+      full_name: meta.full_name ?? meta.name ?? null,
+      role: roleFromMetadata(user),
+    })
+    return await fetchProfile(user.id)
+  }, [fetchProfile, supabase])
+
   useEffect(() => {
     let cancelled = false
 
-    const applySession = async (session: Session | null) => {
-      const user = session?.user ?? null
+    const applyUser = async (user: User | null, session: Session | null) => {
       let profile: Profile | null = null
       try {
-        profile = user ? await fetchProfile(user.id) : null
+        if (user) profile = await ensureProfile(user)
       } catch {
         profile = null
       }
@@ -79,7 +102,14 @@ export function useAuth() {
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        await applySession(session)
+        let user = session?.user ?? null
+
+        if (!user) {
+          const { data: { user: verified } } = await supabase.auth.getUser()
+          user = verified ?? null
+        }
+
+        await applyUser(user, session)
       } catch {
         if (!cancelled) {
           setState({
@@ -90,16 +120,25 @@ export function useAuth() {
       }
     }
 
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setState((prev) => prev.loading
+          ? { ...prev, loading: false }
+          : prev)
+      }
+    }, AUTH_INIT_TIMEOUT_MS)
+
     init()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await applySession(session)
+      await applyUser(session?.user ?? null, session)
     })
 
     return () => {
       cancelled = true
+      window.clearTimeout(timeout)
       subscription.unsubscribe()
     }
-  }, [fetchProfile, supabase])
+  }, [ensureProfile, supabase])
 
   const signOut = async () => { await supabase.auth.signOut() }
   return { ...state, signOut }

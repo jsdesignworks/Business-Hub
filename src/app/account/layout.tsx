@@ -33,7 +33,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     if (isAdmin) router.push('/admin')
   }, [loading, user, isAdmin, router])
 
-  if (loading) return (
+  if (loading || !user) return (
     <div className="flex h-screen">
       <div className="w-60 border-r bg-white p-4 space-y-2">
         {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
@@ -41,8 +41,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
       <div className="flex-1 p-8"><Skeleton className="h-64 w-full" /></div>
     </div>
   )
-
-  if (!user) return null
 
   if (!profile) {
     return (

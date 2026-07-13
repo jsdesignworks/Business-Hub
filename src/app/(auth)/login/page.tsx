@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -47,13 +45,13 @@ export default function LoginPage() {
         .maybeSingle()
       if (upsertError) {
         toast.error(upsertError.message)
-        setLoading(false)
-        return
+      } else {
+        profile = upserted
       }
-      profile = upserted
     }
 
-    router.push(profile?.role === 'admin' ? '/admin' : '/account')
+    const dest = profile?.role === 'admin' ? '/admin' : '/account'
+    window.location.assign(dest)
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
