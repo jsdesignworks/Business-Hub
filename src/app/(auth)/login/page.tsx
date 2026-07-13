@@ -45,9 +45,10 @@ export default function LoginPage() {
         .maybeSingle()
       if (upsertError) {
         toast.error(upsertError.message)
-      } else {
-        profile = upserted
+        setLoading(false)
+        return
       }
+      profile = upserted
     }
 
     const dest = profile?.role === 'admin' ? '/admin' : '/account'
