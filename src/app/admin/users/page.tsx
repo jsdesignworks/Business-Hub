@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/hooks/use-auth'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -19,11 +19,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 type AppUser = {
   id: string
   email: string
-  full_name: string
-  role: 'admin' | 'client'
-  status: 'active' | 'inactive'
+  full_name: string | null
+  role: 'admin' | 'client' | 'prospect'
   created_at: string
-  last_sign_in_at?: string
 }
 
 export default function AdminUsersPage() {
@@ -43,10 +41,11 @@ export default function AdminUsersPage() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('clients')
-        .select('id, email, full_name, role, status, created_at')
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role, created_at')
         .order('created_at', { ascending: false })
+      if (error) throw error
       return (data || []) as AppUser[]
     },
     enabled: !!user,
@@ -61,7 +60,7 @@ export default function AdminUsersPage() {
 
   const updateRole = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: string }) => {
-      const { error } = await supabase.from('clients').update({ role }).eq('id', id)
+      const { error } = await supabase.from('profiles').update({ role }).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => {
@@ -72,30 +71,24 @@ export default function AdminUsersPage() {
     onError: () => toast.error('Failed to update role'),
   })
 
-  const toggleStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from('clients').update({ status }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
-      toast.success('Status updated')
-    },
-    onError: () => toast.error('Failed to update status'),
-  })
-
   async function sendInvite() {
     setInviting(true)
     try {
-      const { error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail, {
-        data: { role: inviteRole },
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
       })
-      if (error) throw error
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to send invitation')
+      }
       toast.success(`Invitation sent to ${inviteEmail}`)
       setShowInvite(false)
       setInviteEmail('')
-    } catch {
-      toast.error('Failed to send invitation — check Supabase admin key')
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send invitation')
     } finally {
       setInviting(false)
     }
@@ -112,7 +105,7 @@ export default function AdminUsersPage() {
   }
 
   const adminCount = users.filter(u => u.role === 'admin').length
-  const activeCount = users.filter(u => u.status === 'active').length
+  const clientCount = users.filter(u => u.role === 'client').length
 
   return (
     <div className="p-6 space-y-6">
@@ -121,7 +114,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {users.length} total &middot; {activeCount} active &middot; {adminCount} admin
+            {users.length} total &middot; {clientCount} client &middot; {adminCount} admin
           </p>
         </div>
         <Button onClick={() => setShowInvite(true)} className="bg-indigo-600 hover:bg-indigo-700">
@@ -169,10 +162,10 @@ export default function AdminUsersPage() {
               <div key={u.id} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors">
                 <Avatar className="h-9 w-9 flex-shrink-0">
                   <AvatarFallback className="bg-indigo-100 text-indigo-700 text-sm font-medium">
-                    {initials(u.full_name, u.email)}
+                    {initials(u.full_name || '', u.email)}
                   </AvatarFallback>
                 </Avatar>
-            2   <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-gray-900 text-sm truncate">
                       {u.full_name || u.email}
@@ -186,16 +179,8 @@ export default function AdminUsersPage() {
                       {u.role === 'admin' ? (
                         <><Shield className="h-3 w-3 mr-1" />Admin</>
                       ) : (
-                        <><User className="h-3 w-3 mr-1" />Client</>
+                        <><User className="h-3 w-3 mr-1" />{u.role === 'prospect' ? 'Prospect' : 'Client'}</>
                       )}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${u.status === 'active'
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-gray-50 text-gray-500 border-gray-200'}`}
-                    >
-                      {u.status || 'active'}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
@@ -213,16 +198,11 @@ export default function AdminUsersPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => { setEditingUser(u); setNewRole(u.role) }}>
+                    <DropdownMenuItem onClick={() => {
+                      setEditingUser(u)
+                      setNewRole(u.role === 'admin' ? 'admin' : 'client')
+                    }}>
                       Change Role
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => toggleStatus.mutate({
-                        id: u.id,
-                        status: u.status === 'active' ? 'inactive' : 'active',
-                      })}
-                    >
-                      {u.status === 'active' ? 'Deactivate' : 'Activate'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

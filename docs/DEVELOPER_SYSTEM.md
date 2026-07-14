@@ -97,7 +97,11 @@ Required for Supabase (client and middleware):
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Set these in `.env.local` locally and in the hosting dashboard (e.g. Vercel) for production. `NEXT_PUBLIC_*` values are baked in at **build** time — change them on Vercel, then redeploy.
+Server-only (never prefix with `NEXT_PUBLIC_`):
+
+- `SUPABASE_SERVICE_ROLE_KEY` — used by `/api/admin/invite` to call `auth.admin.inviteUserByEmail`. Copy from Supabase → Project Settings → API → `service_role`. Keep this out of the browser and client bundles.
+
+Set these in `.env.local` locally and in the hosting dashboard (e.g. Vercel) for production. `NEXT_PUBLIC_*` values are baked in at **build** time — change them on Vercel, then redeploy. After adding `SUPABASE_SERVICE_ROLE_KEY`, redeploy so the invite route can read it.
 
 **Profiles 404:** If Network shows `GET/POST .../rest/v1/profiles` → **404**, the `profiles` table is missing on the linked Supabase project. Run [`supabase/migrations/20260713_ensure_profiles.sql`](../supabase/migrations/20260713_ensure_profiles.sql) in the SQL Editor for project **`yvtxsormqbeoszzkfhby`** (must match `NEXT_PUBLIC_SUPABASE_URL`).
 
@@ -210,8 +214,9 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
 
 1. Connect the repo to Vercel (or similar).
 2. Set **`NEXT_PUBLIC_SUPABASE_URL`** and **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** in the project environment (Vercel → Settings → Environment Variables → Production). Values must match Supabase → Project Settings → API. Redeploy after changing `NEXT_PUBLIC_*`.
-3. Confirm Production has both keys before shipping: project **business-hub** (`dash.designworks.app`). Missing keys cause cryptic auth 422s; the client now throws a clear error if either is unset at runtime.
-4. In **Supabase Auth → URL Configuration**, use these values for production (`dash.designworks.app`):
+3. Set **`SUPABASE_SERVICE_ROLE_KEY`** (server-only) for admin invite via `/api/admin/invite`. Same API page in Supabase; do **not** use `NEXT_PUBLIC_`. Redeploy after adding it.
+4. Confirm Production has the public keys before shipping: project **business-hub** (`dash.designworks.app`). Missing keys cause cryptic auth 422s; the client now throws a clear error if either is unset at runtime.
+5. In **Supabase Auth → URL Configuration**, use these values for production (`dash.designworks.app`):
 
    | Setting | Value |
    |---------|--------|
@@ -219,7 +224,7 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
    | **Redirect URLs** | `https://dash.designworks.app/reset-password`, `https://dash.designworks.app/login`, `http://localhost:3000/reset-password`, `http://localhost:3000/login` |
 
    Password reset emails use `redirectTo` → `/reset-password`. After changing Site URL / Redirect URLs, send a **new** reset email; old links keep the previous destination.
-5. The System page’s **Vercel** badge appears only if **`NEXT_PUBLIC_VERCEL_ENV`** is injected (Vercel does this automatically on their platform when configured).
+6. The System page’s **Vercel** badge appears only if **`NEXT_PUBLIC_VERCEL_ENV`** is injected (Vercel does this automatically on their platform when configured).
 
 ---
 
@@ -228,7 +233,7 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
 - **Multi-tenancy / SaaS**: current model is largely a single business hub; scaling to multiple tenants usually requires explicit `organization_id` (or similar) on rows and stricter RLS — plan separately.
 - **Invoice field naming**: some analytics code may reference legacy column names; align selects with the live DB and [`src/types/index.ts`](src/types/index.ts).
 - **Activity feed**: synthetic only; for audit trails consider an `audit_log` table or Supabase triggers later.
-- **Service role**: elevated operations should use server routes with the **service role** key — never expose it in `NEXT_PUBLIC_*` or client bundles.
+- **Service role**: `/api/admin/invite` uses `SUPABASE_SERVICE_ROLE_KEY` — never expose it in `NEXT_PUBLIC_*` or client bundles. Add other admin Auth ops the same way.
 
 ---
 
