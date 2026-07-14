@@ -1,6 +1,6 @@
 'use client'
 import { useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
@@ -32,29 +32,63 @@ const navItems = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, isAdmin, signOut } = useAuth()
-  const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
     if (loading) return
-    if (!user) {
-      router.push('/login')
-      return
-    }
-    if (!isAdmin) router.push('/account')
-  }, [loading, user, isAdmin, router])
+    if (!user) return
+    if (!isAdmin) window.location.assign('/account')
+  }, [loading, user, isAdmin])
 
-  if (loading || !user || !isAdmin) return (
-    <div className="flex h-screen">
-      <div className="w-60 border-r bg-white p-4 space-y-2">
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+  if (loading) {
+    return (
+      <div className="flex h-screen">
+        <div className="w-60 border-r bg-white p-4 space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+        </div>
+        <div className="flex-1 p-8 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-64 w-full" />
+        </div>
       </div>
-      <div className="flex-1 p-8 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="max-w-md w-full space-y-4 text-center">
+          <h1 className="text-xl font-semibold text-gray-900">Session not found</h1>
+          <p className="text-sm text-gray-500">
+            We couldn&apos;t load your signed-in session in this browser. Sign in again.
+          </p>
+          <Button
+            onClick={async () => {
+              await signOut()
+              window.location.assign('/login')
+            }}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Back to sign in
+          </Button>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="max-w-md w-full space-y-4 text-center">
+          <h1 className="text-xl font-semibold text-gray-900">Redirecting…</h1>
+          <p className="text-sm text-gray-500">Taking you to your account.</p>
+          <Button variant="outline" onClick={() => window.location.assign('/account')}>
+            Continue to account
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">

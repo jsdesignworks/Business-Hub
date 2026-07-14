@@ -121,11 +121,23 @@ export function useAuth() {
     }
 
     const timeout = window.setTimeout(() => {
-      if (!cancelled) {
-        setState((prev) => prev.loading
-          ? { ...prev, loading: false }
-          : prev)
-      }
+      void (async () => {
+        if (cancelled) return
+        try {
+          const { data: { user: verified } } = await supabase.auth.getUser()
+          if (verified) {
+            await applyUser(verified, null)
+            return
+          }
+        } catch {
+          // fall through
+        }
+        if (!cancelled) {
+          setState((prev) => prev.loading
+            ? { ...prev, loading: false }
+            : prev)
+        }
+      })()
     }, AUTH_INIT_TIMEOUT_MS)
 
     init()

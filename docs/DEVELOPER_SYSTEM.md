@@ -99,7 +99,9 @@ Required for Supabase (client and middleware):
 
 Set these in `.env.local` locally and in the hosting dashboard (e.g. Vercel) for production. `NEXT_PUBLIC_*` values are baked in at **build** time — change them on Vercel, then redeploy.
 
-**Profiles RLS:** own-row policy must use `auth.uid() = id`. If sign-in reaches “Account not set up” or profile upsert fails, run [`supabase/migrations/20260712_fix_profiles_own_rls.sql`](../supabase/migrations/20260712_fix_profiles_own_rls.sql) in the Supabase SQL Editor.
+**Profiles 404:** If Network shows `GET/POST .../rest/v1/profiles` → **404**, the `profiles` table is missing on the linked Supabase project. Run [`supabase/migrations/20260713_ensure_profiles.sql`](../supabase/migrations/20260713_ensure_profiles.sql) in the SQL Editor for project **`yvtxsormqbeoszzkfhby`** (must match `NEXT_PUBLIC_SUPABASE_URL`).
+
+**Profiles RLS recursion:** If profiles returns `42P17` / “infinite recursion detected in policy”, run [`supabase/migrations/20260713_fix_profiles_rls_recursion.sql`](../supabase/migrations/20260713_fix_profiles_rls_recursion.sql).
 
 ### 3.4 DevTools: “No API key found” vs real failures
 
@@ -124,6 +126,8 @@ To verify the real request on `/account` (or any signed-in page):
 ## 4. Database and schema
 
 - Authoritative SQL snapshot: [`supabase/schema.sql`](supabase/schema.sql).
+- **Required for login:** [`supabase/migrations/20260713_ensure_profiles.sql`](../supabase/migrations/20260713_ensure_profiles.sql) — creates `public.profiles`, RLS, signup trigger, and backfills existing `auth.users`. Run in SQL Editor on **`yvtxsormqbeoszzkfhby`** if `/rest/v1/profiles` returns 404.
+- **Admin access:** [`supabase/migrations/20260713_ensure_jake_admin.sql`](../supabase/migrations/20260713_ensure_jake_admin.sql) sets `jake@designworks.app` to `role = 'admin'`.
 - The live Supabase project may include extra tables (e.g. `documents`, `organizations`) used by admin pages even if not every object appears in an older SQL dump.
 - **RLS** applies to all client-side queries. Admin features assume policies allow admins to read/write the probed tables. If a table is missing or RLS denies access, probes and lists may show errors or empty data.
 
