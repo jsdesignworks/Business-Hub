@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -11,7 +12,12 @@ function getSupabaseEnv() {
   return { url, anonKey }
 }
 
+/** One browser client per page load — avoids gotrue lock contention across callers. */
+let browserClient: SupabaseClient | null = null
+
 export function createClient() {
+  if (browserClient) return browserClient
   const { url, anonKey } = getSupabaseEnv()
-  return createBrowserClient(url, anonKey)
+  browserClient = createBrowserClient(url, anonKey)
+  return browserClient
 }

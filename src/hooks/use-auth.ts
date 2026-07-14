@@ -1,7 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState, useCallback } from 'react'
-import type { User, Session, SupabaseClient } from '@supabase/supabase-js'
+import type { User, Session } from '@supabase/supabase-js'
 import type { Profile } from '@/types'
 
 interface AuthState {
@@ -14,14 +14,8 @@ interface AuthState {
   isProspect: boolean
 }
 
-const AUTH_INIT_TIMEOUT_MS = 8000
-
-let browserClient: SupabaseClient | null = null
-
-function getBrowserClient() {
-  if (!browserClient) browserClient = createClient()
-  return browserClient
-}
+/** Hard ceiling — must not await hung gotrue locks. */
+const AUTH_HARD_TIMEOUT_MS = 5000
 
 function rolesFromProfile(profile: Profile | null) {
   return {
@@ -39,26 +33,18 @@ function roleFromMetadata(user: User): Profile['role'] {
   return 'client'
 }
 
-export function useAuth() {
-  // DEV BYPASS: return mock user when dev_bypass cookie is active
-  if (typeof document !== 'undefined' && document.cookie.includes('dev_bypass=1')) {
-    const mockUser = { id: 'dev-user', email: 'dev@test.local' } as any
-    const mockProfile = { id: 'dev-user', role: 'admin', full_name: 'Dev User' } as any
-    return {
-      user: mockUser, session: null, profile: mockProfile,
-      loading: false, isAdmin: true, isClient: false, isProspect: false,
-      signOut: async () => {
-        document.cookie = 'dev_bypass=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/'
-        window.location.reload()
-      },
-    }
-  }
+const emptyAuth: AuthState = {
+  user: null, session: null, profile: null,
+  loading: false, isAdmin: false, isClient: false, isProspect: false,
+}
 
+export function useAuth() {
   const [state, setState] = useState<AuthState>({
     user: null, session: null, profile: null,
     loading: true, isAdmin: false, isClient: false, isProspect: false,
   })
-  const [supabase] = useState(() => getBrowserClient())
+  const [supabase] = useState(() => createClient())
+  const [devBypass, setDevBypass] = useState(false)
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
@@ -82,6 +68,25 @@ export function useAuth() {
   useEffect(() => {
     let cancelled = false
 
+    if (document.cookie.includes('dev_bypass=1')) {
+      setDevBypass(true)
+      setState({
+        user: { id: 'dev-user', email: 'dev@test.local' } as User,
+        session: null,
+        profile: {
+          id: 'dev-user',
+          email: 'dev@test.local',
+          full_name: 'Dev User',
+          avatar_url: null,
+          role: 'admin',
+          created_at: '',
+          updated_at: '',
+        },
+        loading: false, isAdmin: true, isClient: false, isProspect: false,
+      })
+      return
+    }
+
     const applyUser = async (user: User | null, session: Session | null) => {
       let profile: Profile | null = null
       try {
@@ -99,59 +104,34 @@ export function useAuth() {
       })
     }
 
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        let user = session?.user ?? null
-
-        if (!user) {
-          const { data: { user: verified } } = await supabase.auth.getUser()
-          user = verified ?? null
-        }
-
-        await applyUser(user, session)
-      } catch {
-        if (!cancelled) {
-          setState({
-            user: null, session: null, profile: null,
-            loading: false, isAdmin: false, isClient: false, isProspect: false,
-          })
-        }
-      }
-    }
-
-    const timeout = window.setTimeout(() => {
-      void (async () => {
-        if (cancelled) return
-        try {
-          const { data: { user: verified } } = await supabase.auth.getUser()
-          if (verified) {
-            await applyUser(verified, null)
-            return
-          }
-        } catch {
-          // fall through
-        }
-        if (!cancelled) {
-          setState((prev) => prev.loading
-            ? { ...prev, loading: false }
-            : prev)
-        }
-      })()
-    }, AUTH_INIT_TIMEOUT_MS)
-
-    init()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await applyUser(session?.user ?? null, session)
+    // INITIAL_SESSION covers cookie/session restore without stacking getSession+getUser
+    // (those share a navigator lock and can hang past 5s — Codex audit finding).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      void applyUser(session?.user ?? null, session)
     })
+
+    // Force-clear loading; do not await another lock-bound auth call here.
+    const hardTimeout = window.setTimeout(() => {
+      if (cancelled) return
+      setState((prev) => (prev.loading ? { ...prev, loading: false } : prev))
+    }, AUTH_HARD_TIMEOUT_MS)
 
     return () => {
       cancelled = true
-      window.clearTimeout(timeout)
+      window.clearTimeout(hardTimeout)
       subscription.unsubscribe()
     }
   }, [ensureProfile, supabase])
 
-  const signOut = async () => { await supabase.auth.signOut() }
+  const signOut = async () => {
+    if (devBypass) {
+      document.cookie = 'dev_bypass=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/'
+      window.location.reload()
+      return
+    }
+    await supabase.auth.signOut()
+    setState(emptyAuth)
+  }
+
   return { ...state, signOut }
 }
