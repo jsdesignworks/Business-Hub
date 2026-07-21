@@ -131,7 +131,9 @@ To verify the real request on `/account` (or any signed-in page):
 
 - Authoritative SQL snapshot: [`supabase/schema.sql`](supabase/schema.sql).
 - **Required for login:** [`supabase/migrations/20260713_ensure_profiles.sql`](../supabase/migrations/20260713_ensure_profiles.sql) — creates `public.profiles`, RLS, signup trigger, and backfills existing `auth.users`. Run in SQL Editor on **`yvtxsormqbeoszzkfhby`** if `/rest/v1/profiles` returns 404.
+- **Required for Add Client / Clients list:** [`supabase/migrations/20260719_ensure_clients.sql`](../supabase/migrations/20260719_ensure_clients.sql) — creates `public.clients` (CRM records) with RLS via `is_admin()`. Run if Network shows PostgREST error **PGRST205** / “Could not find the table `public.clients` in the schema cache.”
 - **Admin access:** [`supabase/migrations/20260713_ensure_jake_admin.sql`](../supabase/migrations/20260713_ensure_jake_admin.sql) sets `jake@designworks.app` to `role = 'admin'`.
+- **Auth vs CRM:** `profiles` = login identity + role (`admin` / `client` / `prospect`). `clients` = CRM contact/prospect record. Admin **Invite User** creates auth + `profiles`; **Add Client** creates a CRM row only (`profile_id` stays null until linked). Portal access for a client login is intended via `clients.profile_id = auth.uid()`.
 - The live Supabase project may include extra tables (e.g. `documents`, `organizations`) used by admin pages even if not every object appears in an older SQL dump.
 - **RLS** applies to all client-side queries. Admin features assume policies allow admins to read/write the probed tables. If a table is missing or RLS denies access, probes and lists may show errors or empty data.
 
@@ -248,6 +250,8 @@ In the repo, edit **`docs/DEVELOPER_SYSTEM.md`**; redeploy or refresh dev server
 | React Query root | `src/components/shared/Providers.tsx` |
 | System health UI | `src/app/admin/system/page.tsx` |
 | DB schema reference | `supabase/schema.sql` |
+| Ensure clients table | `supabase/migrations/20260719_ensure_clients.sql` |
+| ChatGPT full-app audit prompt | `docs/AUDIT_PROMPT_CHATGPT.md` |
 | This doc (source) | `docs/DEVELOPER_SYSTEM.md` |
 | In-app doc viewer | `src/app/admin/development/page.tsx` |
 
